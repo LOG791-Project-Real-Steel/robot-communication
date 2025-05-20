@@ -1,0 +1,22 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "WebSocketClient\\WebSocketProducer.csproj",
+        "Action": "Start",
+        "DebugTarget": "WebSocketClient"
+      },
+      {
+        "Path": "WebSocketServer\\WebSocketServer.csproj",
+        "Action": "Start",
+        "DebugTarget": "http"
+      },
+      {
+        "Path": "SimpleTunnel\\WebSocketReceiver.csproj",
+        "Action": "Start",
+        "DebugTarget": "SimpleTunnel"
+      }
+    ]
+  }
+]
