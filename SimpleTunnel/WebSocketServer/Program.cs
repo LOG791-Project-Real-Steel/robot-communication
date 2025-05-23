@@ -1,7 +1,5 @@
-using System.Data;
 using System.Net;
 using System.Net.WebSockets;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,22 +34,19 @@ async Task Process()
     if (producer is null)
         return;
 
-    byte[] buffer = new byte[4096];
+    byte[] buffer = new byte[256];
     WebSocketReceiveResult result = await producer.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
     if (result is not null)
     {
         while (!result.CloseStatus.HasValue)
         {
-            string msg = Encoding.UTF8.GetString(new ArraySegment<byte>(buffer, 0, result.Count));
-            Console.WriteLine($"client says: {msg}");
             if (receiver is null)
                 continue;
 
-            Console.WriteLine("Here");
             await receiver.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+            buffer = new byte[256];
             result = await producer.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            //Console.WriteLine(result);
         }
         await producer.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
 
@@ -67,29 +62,25 @@ async Task Receive()
     if (receiver is null)
         return;
 
-    byte[] buffer = new byte[4096];
+    byte[] buffer = new byte[256];
     WebSocketReceiveResult result = await receiver.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
 
     if (result is not null)
     {
         while (!result.CloseStatus.HasValue)
         {
-            string msg = Encoding.UTF8.GetString(new ArraySegment<byte>(buffer, 0, result.Count));
-            Console.WriteLine($"client says: {msg}");
-            if (receiver is null)
+            if (producer is null)
                 continue;
 
-            Console.WriteLine("Here");
-            await receiver.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+            await producer.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+            buffer = new byte[256];
             result = await receiver.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            //Console.WriteLine(result);
         }
 
         if (receiver is not null)
             await receiver.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
     }
 }
-
 
 app.Use((Func<HttpContext, Func<Task>, Task>)(async (context, next) =>
 {

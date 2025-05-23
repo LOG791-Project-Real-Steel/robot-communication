@@ -11,11 +11,6 @@
         "Path": "WebSocketServer\\WebSocketServer.csproj",
         "Action": "Start",
         "DebugTarget": "http"
-      },
-      {
-        "Path": "SimpleTunnel\\WebSocketReceiver.csproj",
-        "Action": "Start",
-        "DebugTarget": "SimpleTunnel"
       }
     ]
   }
