@@ -15,7 +15,7 @@ def hello():
         websocket.send("{\"hello\":\"world\"}")
         while True:
             try:
-                message = json.loads(websocket.recv().rstrip("\x00"))
+                message = json.loads(websocket.recv())
                 print(message)
             except ConnectionClosedOK:
                 break
@@ -32,4 +32,4 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    hello()
