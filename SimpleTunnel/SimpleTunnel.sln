@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebSocketProducer", "WebSoc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebSocketServer", "WebSocketServer\WebSocketServer.csproj", "{5EB618FF-681A-4357-9B68-EDAADF01EE30}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RemoteKeyboardController", "RemoteKeyboardController\RemoteKeyboardController.csproj", "{FFFBE02A-0026-4D2B-B5D2-E1DADAD83F0D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{5EB618FF-681A-4357-9B68-EDAADF01EE30}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5EB618FF-681A-4357-9B68-EDAADF01EE30}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5EB618FF-681A-4357-9B68-EDAADF01EE30}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFFBE02A-0026-4D2B-B5D2-E1DADAD83F0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFFBE02A-0026-4D2B-B5D2-E1DADAD83F0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFFBE02A-0026-4D2B-B5D2-E1DADAD83F0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFFBE02A-0026-4D2B-B5D2-E1DADAD83F0D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
