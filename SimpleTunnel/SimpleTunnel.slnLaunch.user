@@ -1,6 +1,6 @@
 [
   {
-    "Name": "New Profile",
+    "Name": "ServerAndRemote",
     "Projects": [
       {
         "Path": "WebSocketServer\\WebSocketServer.csproj",

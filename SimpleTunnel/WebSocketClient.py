@@ -1,12 +1,7 @@
 #!/usr/bin/env python
-
-"""Client using the threading API."""
-
 from websockets.sync.client import connect
 from websockets.exceptions import ConnectionClosedOK
-
 import json
-
 import time
 
 

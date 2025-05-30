@@ -68,20 +68,16 @@ namespace WebSocketServer
             {
                 while (!result.CloseStatus.HasValue)
                 {
-                    if (controller is null)
-                        continue;
+                    if (controller is not null && !controller.CloseStatus.HasValue)
+                        await controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
 
-                    await controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
                     buffer = new byte[BufferMaxSize];
                     result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                     buffer = TrimEnd(buffer);
                 }
                 await robot.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-
-                if (controller is null)
-                    return;
-
-                await controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                robot.Dispose();
+                robot = null;
             }
         }
 
@@ -98,20 +94,16 @@ namespace WebSocketServer
             {
                 while (!result.CloseStatus.HasValue)
                 {
-                    if (robot is null)
-                        continue;
+                    if (robot is not null && !robot.CloseStatus.HasValue)
+                        await robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
 
-                    await robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
                     buffer = new byte[BufferMaxSize];
                     result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                     buffer = TrimEnd(buffer);
                 }
                 await controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-
-                if (robot is null)
-                    return;
-
-                await robot.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                controller.Dispose();
+                controller = null;
             }
         }
 
