@@ -1,16 +1,16 @@
 [
   {
-    "Name": "New Profile",
+    "Name": "ServerAndRemote",
     "Projects": [
-      {
-        "Path": "WebSocketClient\\WebSocketProducer.csproj",
-        "Action": "Start",
-        "DebugTarget": "WebSocketClient"
-      },
       {
         "Path": "WebSocketServer\\WebSocketServer.csproj",
         "Action": "Start",
         "DebugTarget": "http"
+      },
+      {
+        "Path": "RemoteKeyboardController\\RemoteKeyboardController.csproj",
+        "Action": "Start",
+        "DebugTarget": "RemoteKeyboardController"
       }
     ]
   }
