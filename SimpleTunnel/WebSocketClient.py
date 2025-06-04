@@ -1,30 +1,25 @@
 #!/usr/bin/env python
-from websockets.sync.client import connect
-from websockets.exceptions import ConnectionClosedOK
+# -*- coding: utf-8 -*-
+
 import json
-import time
+import asyncio
+import websockets
+from jetracer.nvidia_racecar import NvidiaRacecar
 
-
-def hello():
-    with connect("ws://localhost:5000/receive") as websocket:
-        websocket.send("{\"hello\":\"world\"}")
+async def hello():
+    car = NvidiaRacecar()
+    car.steering_gain = -1
+    car.steering_offset = 0
+    car.steering = 0
+    car.throttle_gain = 0.8
+    print("ready to go!")
+    async with websockets.connect("ws://192.168.0.241:5000/receive") as websocket:
+        await websocket.send('{"Hello world!": "Hello WebSocket!"}')
         while True:
-            try:
-                message = json.loads(websocket.recv())
-                print(message)
-            except ConnectionClosedOK:
-                break
-
-def test():
-    with connect("ws://localhost:5000/receive") as websocket:
-        start_time = time.time()
-        websocket.send("{\"hello\":\"world\",\"test\":\"test\",\"test2\":\"test2\"}")
-        message = json.loads(websocket.recv().rstrip("\x00"))
-        print(message)
-        end_time = time.time()
-        elapsed_time = (end_time - start_time) * 1000 / 2 # Convert to milliseconds
-        print(f"Elapsed time: {elapsed_time} ms")
-
+            message = json.loads(await websocket.recv())
+            jsonCar = message.get('Car', {})
+            car.steering = jsonCar.get('Steering', 0.0)
+            car.throttle = jsonCar.get('Throttle', 0.0)
 
 if __name__ == "__main__":
-    hello()
+    asyncio.get_event_loop().run_until_complete(hello())

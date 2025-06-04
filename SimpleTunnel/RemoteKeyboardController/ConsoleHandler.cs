@@ -44,16 +44,13 @@ namespace RemoteKeyboardController
                         await client.ConnectAsync(uri, cts.Token);
                         while (client.State == WebSocketState.Open)
                         {
-                            await Task.Delay(200);
+                            await Task.Delay(50);
 
                             if (Msg is null)
                                 continue;
 
                             ArraySegment<byte> buffer = new(Encoding.UTF8.GetBytes(Msg.Json()));
                             await client.SendAsync(buffer, WebSocketMessageType.Text, true, cts.Token);
-
-                            car.Throttle += car.Throttle == 0 ? 0 : car.Throttle < 0 ? ThrottleAutoRate : -ThrottleAutoRate;
-                            car.Steering += car.Steering == 0 ? 0 : car.Steering < 0 ? SteeringAutoRate : -SteeringAutoRate;
 
                             if (Msg is QuitMessage)
                             {
@@ -111,12 +108,6 @@ namespace RemoteKeyboardController
                     if (state == State.Quitting)
                         continue;
 
-                    if (!Console.KeyAvailable)
-                    {
-                        Msg = new MoveMessage(car);
-                        continue;
-                    }
-
                     key = Console.ReadKey();
                     switch (key.Key)
                     {
@@ -127,7 +118,7 @@ namespace RemoteKeyboardController
                             break;
 
                         case ConsoleKey.W:
-                            car.Throttle += ThrottleRate;
+                            car.Throttle -= ThrottleRate;
                             Msg = new MoveMessage(car);
                             break;
 
@@ -137,7 +128,7 @@ namespace RemoteKeyboardController
                             break;
 
                         case ConsoleKey.S:
-                            car.Throttle -= ThrottleRate;
+                            car.Throttle += ThrottleRate;
                             Msg = new MoveMessage(car);
                             break;
 
