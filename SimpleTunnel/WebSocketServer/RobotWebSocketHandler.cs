@@ -57,52 +57,73 @@ namespace WebSocketServer
 
         private async Task StartRobotProcess()
         {
-            if (robot is null)
-                return;
-
-            byte[] buffer = new byte[BufferMaxSize];
-            WebSocketReceiveResult result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            buffer = TrimEnd(buffer);
-
-            if (result is not null)
+            try
             {
-                while (!result.CloseStatus.HasValue)
-                {
-                    if (controller is not null && !controller.CloseStatus.HasValue)
-                        await controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                if (robot is null)
+                    return;
 
-                    buffer = new byte[BufferMaxSize];
-                    result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
+                byte[] buffer = new byte[BufferMaxSize];
+                WebSocketReceiveResult result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                buffer = TrimEnd(buffer);
+
+                if (result is not null)
+                {
+                    while (!result.CloseStatus.HasValue)
+                    {
+                        if (controller is not null && !controller.CloseStatus.HasValue)
+                            await controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+
+                        buffer = new byte[BufferMaxSize];
+                        result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        buffer = TrimEnd(buffer);
+                    }
                 }
-                await robot.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                robot.Dispose();
+            }
+            catch (Exception)
+            {
+                // TODO: Add logger to log error.
+            }
+            finally
+            {
+                robot!.Dispose();
                 robot = null;
             }
         }
 
         private async Task StartControllerProcess()
         {
-            if (controller is null)
-                return;
-
-            byte[] buffer = new byte[BufferMaxSize];
-            WebSocketReceiveResult result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-            buffer = TrimEnd(buffer);
-
-            if (result is not null)
+            try
             {
-                while (!result.CloseStatus.HasValue)
-                {
-                    if (robot is not null && !robot.CloseStatus.HasValue)
-                        await robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                if (controller is null)
+                    return;
 
-                    buffer = new byte[BufferMaxSize];
-                    result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
+                byte[] buffer = new byte[BufferMaxSize];
+                WebSocketReceiveResult result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                buffer = TrimEnd(buffer);
+
+                if (result is not null)
+                {
+                    while (!result.CloseStatus.HasValue)
+                    {
+                        if (robot is not null && !robot.CloseStatus.HasValue)
+                            await robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+
+                        buffer = new byte[BufferMaxSize];
+                        result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        buffer = TrimEnd(buffer);
+                    }
+                    await controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                    controller.Dispose();
+                    controller = null;
                 }
-                await controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                controller.Dispose();
+            }
+            catch (Exception)
+            {
+                // TODO: Add logger to log error.
+            }
+            finally
+            {
+                controller!.Dispose();
                 controller = null;
             }
         }
