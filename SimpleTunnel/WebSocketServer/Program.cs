@@ -18,7 +18,7 @@ app.UseWebSockets(wsOptions);
 
 // Use the robot WebSocket Controller for WebSocket management.
 RobotWebSocketHandler robotController = app.Services.GetRequiredService<RobotWebSocketHandler>();
-app.Use(robotController.Control);
+app.Use(robotController.Handle);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

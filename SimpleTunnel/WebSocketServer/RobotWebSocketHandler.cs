@@ -24,7 +24,7 @@ namespace WebSocketServer
             }
         }
 
-        public async Task Control(HttpContext context, Func<Task> next)
+        public async Task Handle(HttpContext context, Func<Task> next)
         {
             if (!context.WebSockets.IsWebSocketRequest)
             {
