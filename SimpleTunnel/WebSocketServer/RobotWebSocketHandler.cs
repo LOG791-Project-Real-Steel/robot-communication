@@ -5,7 +5,7 @@ namespace WebSocketServer
 {
     internal class RobotWebSocketHandler
     {
-        private const int BufferMaxSize = 4096;
+        private const int BufferMaxSize = 65536;
 
         private WebSocket? robot = null;
         private HttpContext? robotContext = null;
@@ -85,7 +85,7 @@ namespace WebSocketServer
             }
             finally
             {
-                robot!.Dispose();
+                robot?.Dispose();
                 robot = null;
             }
         }
@@ -123,7 +123,7 @@ namespace WebSocketServer
             }
             finally
             {
-                controller!.Dispose();
+                controller?.Dispose();
                 controller = null;
             }
         }
