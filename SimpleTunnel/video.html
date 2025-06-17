@@ -63,96 +63,132 @@
         };
         
 
-        window.onkeydown = (event) => {
-            switch (event.key) {
-                case 'ArrowUp':
-                case 'w':
-                    up = true;
-                    break;
-                case 'ArrowDown':
-                case 's':
-                    down = true;
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                    left = true;
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                    right = true;
-                    break;
-                default:
-                    console.log(`Key pressed: ${event.key}`);
-                    break;
-            }
-        };
+        // window.onkeydown = (event) => {
+        //     switch (event.key) {
+        //         case 'ArrowUp':
+        //         case 'w':
+        //             up = true;
+        //             break;
+        //         case 'ArrowDown':
+        //         case 's':
+        //             down = true;
+        //             break;
+        //         case 'ArrowLeft':
+        //         case 'a':
+        //             left = true;
+        //             break;
+        //         case 'ArrowRight':
+        //         case 'd':
+        //             right = true;
+        //             break;
+        //         default:
+        //             console.log(`Key pressed: ${event.key}`);
+        //             break;
+        //     }
+        // };
 
-        window.onkeyup = (event) => {
-            switch (event.key) {
-                case 'ArrowUp':
-                case 'w':
-                    up = false;
-                    break;
-                case 'ArrowDown':
-                case 's':
-                    down = false;
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                    left = false;
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                    right = false;
-                    break;
-                default:
-                    console.log(`Key pressed: ${event.key}`);
-                    break;
-            }
-        };
+        // window.onkeyup = (event) => {
+        //     switch (event.key) {
+        //         case 'ArrowUp':
+        //         case 'w':
+        //             up = false;
+        //             break;
+        //         case 'ArrowDown':
+        //         case 's':
+        //             down = false;
+        //             break;
+        //         case 'ArrowLeft':
+        //         case 'a':
+        //             left = false;
+        //             break;
+        //         case 'ArrowRight':
+        //         case 'd':
+        //             right = false;
+        //             break;
+        //         default:
+        //             console.log(`Key pressed: ${event.key}`);
+        //             break;
+        //     }
+        // };
 
-        const zeroIn = (value, mod) => {
-            let dif = 0 - value;
-            if (Math.abs(dif) < mod) {
-                return 0;
-            } else if (dif > 0) {
-                return value + mod;
+        // const zeroIn = (value, mod) => {
+        //     let dif = 0 - value;
+        //     if (Math.abs(dif) < mod) {
+        //         return 0;
+        //     } else if (dif > 0) {
+        //         return value + mod;
+        //     } else {
+        //         return value - mod;
+        //     }
+        // };
+
+        // const cap = (value, min, max) => {
+        //     if (value < min) {
+        //         return min;
+        //     } else if (value > max) {
+        //         return max;
+        //     }
+        //     return value;
+        // };
+
+        // setInterval(() => {
+        //     if (up || down) {
+        //         riceCar.Car.Throttle -= up ? throttleMod : 0;
+        //         riceCar.Car.Throttle += down ? throttleMod : 0;
+        //     } else {
+        //         riceCar.Car.Throttle = zeroIn(riceCar.Car.Throttle, 1);
+        //     }
+
+        //     if (left || right) {
+        //         riceCar.Car.Steering -= right ? steeringMod : 0;
+        //         riceCar.Car.Steering += left ? steeringMod : 0;
+        //     } else {
+        //         riceCar.Car.Steering = zeroIn(riceCar.Car.Steering, 1);
+        //     }
+
+        //     riceCar.Car.Throttle = cap(riceCar.Car.Throttle, -1, 1);
+        //     riceCar.Car.Steering = cap(riceCar.Car.Steering, -1, 1);
+
+        //     ws.send(JSON.stringify(riceCar));
+        //     console.log(JSON.stringify(riceCar));
+        // }, 50);
+
+
+        let controllerIndex = null;
+
+        window.addEventListener("gamepadconnected", (event) => {
+            handleConnectDisconnect(event, true);
+        });
+
+        window.addEventListener("gamepaddisconnected", (event) => {
+            handleConnectDisconnect(event, false);
+        });
+
+        function handleConnectDisconnect(event, connected) {
+            const gamepad = event.gamepad;
+            if (connected) {
+                controllerIndex = gamepad.index;
             } else {
-                return value - mod;
+                controllerIndex = null;
             }
-        };
+        }
 
-        const cap = (value, min, max) => {
-            if (value < min) {
-                return min;
-            } else if (value > max) {
-                return max;
-            }
-            return value;
-        };
+        function gameLoop() {
+            if (controllerIndex !== null) {
+                const gamepad = navigator.getGamepads()[controllerIndex];
+                const vals = {up: gamepad.buttons[6].value, down: gamepad.buttons[7].value, leftRight: gamepad.axes[0]};
+                
+                riceCar.Car.Throttle = gamepad.buttons[6].value - gamepad.buttons[7].value;
+                riceCar.Car.Steering = -gamepad.axes[0];
 
-        setInterval(() => {
-            if (up || down) {
-                riceCar.Car.Throttle += up ? throttleMod : 0;
-                riceCar.Car.Throttle -= down ? throttleMod : 0;
-            } else {
-                riceCar.Car.Throttle = zeroIn(riceCar.Car.Throttle, 1);
+                ws.send(JSON.stringify(riceCar));
+                console.log(JSON.stringify(riceCar));
             }
 
-            if (left || right) {
-                riceCar.Car.Steering += right ? steeringMod : 0;
-                riceCar.Car.Steering -= left ? steeringMod : 0;
-            } else {
-                riceCar.Car.Steering = zeroIn(riceCar.Car.Steering, 1);
-            }
+            requestAnimationFrame(gameLoop);
+        }
 
-            riceCar.Car.Throttle = cap(riceCar.Car.Throttle, -1, 1);
-            riceCar.Car.Steering = cap(riceCar.Car.Steering, -1, 1);
-
-            ws.send(JSON.stringify(riceCar));
-            console.log(JSON.stringify(riceCar));
-        }, 200);
-
+        gameLoop();
     </script>
 </body>
 
