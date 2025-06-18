@@ -5,14 +5,20 @@ using System.Text;
 
 await Task.Delay(1000);
 
+var port = Environment.GetEnvironmentVariable("PORT");
+if (port is null)
+{
+    Console.WriteLine("Environment variable PORT was not found in WebSocketProducer. Defaulting to 5000...");
+    port = "5000";
+}
+
 using ClientWebSocket client = new();
-Uri uri = new Uri("ws://localhost:5000/send");
+Uri uri = new($"ws://[::]:{port}/oculus");
 CancellationTokenSource cts = new();
 cts.CancelAfter(TimeSpan.FromSeconds(120));
 try
 {
     await client.ConnectAsync(uri, cts.Token);
-    Task recvTask = Receive();
     while (client.State == WebSocketState.Open)
     {
         Console.WriteLine("Enter message to send");
@@ -28,8 +34,6 @@ try
         ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(json));
         await client.SendAsync(buffer, WebSocketMessageType.Text, true, cts.Token);
     }
-
-    await recvTask;
 }
 catch (WebSocketException e)
 {
@@ -37,16 +41,5 @@ catch (WebSocketException e)
 }
 
 Console.ReadLine();
-
-async Task Receive()
-{
-    while (client.State == WebSocketState.Open)
-    {
-        byte[] buffer = new byte[256];
-        WebSocketReceiveResult result = await client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-
-        await client.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, cts.Token);
-    }
-}
 
 record Message(string message);
