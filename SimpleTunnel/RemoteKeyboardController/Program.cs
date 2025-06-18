@@ -8,6 +8,6 @@ if (port is null)
     port = "5000";
 }
 
-ConsoleHandler handler = new($"localhost:{port}");
+ConsoleHandler handler = new($"[::]:{port}");
 
 handler.Run();

@@ -12,7 +12,7 @@ if (port is null)
 }
 
 using ClientWebSocket client = new();
-Uri uri = new Uri($"ws://localhost:{port}/receive");
+Uri uri = new Uri($"ws://[::]:{port}/receive");
 CancellationTokenSource cts = new();
 cts.CancelAfter(TimeSpan.FromSeconds(120));
 try
