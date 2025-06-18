@@ -12,7 +12,7 @@ if (port is null)
 }
 
 using ClientWebSocket client = new();
-Uri uri = new Uri($"ws://[::]:{port}/receive");
+Uri uri = new Uri($"ws://[::]:{port}/robot");
 CancellationTokenSource cts = new();
 cts.CancelAfter(TimeSpan.FromSeconds(120));
 try

@@ -13,7 +13,7 @@ if (port is null)
 }
 
 using ClientWebSocket client = new();
-Uri uri = new($"ws://[::]:{port}/send");
+Uri uri = new($"ws://[::]:{port}/oculus");
 CancellationTokenSource cts = new();
 cts.CancelAfter(TimeSpan.FromSeconds(120));
 try
