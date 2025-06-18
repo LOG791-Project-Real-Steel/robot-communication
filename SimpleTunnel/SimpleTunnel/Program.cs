@@ -4,8 +4,15 @@ using System.Text;
 
 await Task.Delay(1000);
 
+var port = Environment.GetEnvironmentVariable("PORT");
+if (port is null)
+{
+    Console.WriteLine("Environment variable PORT was not found in WebSocketProducer. Defaulting to 5000...");
+    port = "5000";
+}
+
 using ClientWebSocket client = new();
-Uri uri = new Uri("ws://localhost:5000/receive");
+Uri uri = new Uri($"ws://localhost:{port}/receive");
 CancellationTokenSource cts = new();
 cts.CancelAfter(TimeSpan.FromSeconds(120));
 try
