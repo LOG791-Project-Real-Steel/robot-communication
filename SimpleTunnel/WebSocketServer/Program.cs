@@ -28,7 +28,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 
-app.UseHttpsRedirection();
+// Disabling https for now
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
