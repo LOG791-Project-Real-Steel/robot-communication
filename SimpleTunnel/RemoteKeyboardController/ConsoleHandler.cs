@@ -36,7 +36,7 @@ namespace RemoteKeyboardController
                         await Task.Delay(1000);
 
                     using ClientWebSocket client = new();
-                    Uri uri = new($"ws://{serverAddress}/send");
+                    Uri uri = new($"ws://{serverAddress}/oculus");
                     CancellationTokenSource cts = new();
                     cts.CancelAfter(TimeSpan.FromSeconds(120));
                     try

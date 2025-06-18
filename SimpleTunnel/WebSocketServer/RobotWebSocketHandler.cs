@@ -35,14 +35,14 @@ namespace WebSocketServer
 
             switch (context.Request.Path)
             {
-                case "/send":
+                case "/oculus":
                     controller = await context.WebSockets.AcceptWebSocketAsync();
                     controllerContext = context;
                     controllerTask = StartControllerProcess();
                     await controllerTask;
                     break;
 
-                case "/receive":
+                case "/robot":
                     robot = await context.WebSockets.AcceptWebSocketAsync();
                     robotContext = context;
                     robotTask = StartRobotProcess();
