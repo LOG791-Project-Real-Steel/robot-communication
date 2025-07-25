@@ -66,77 +66,74 @@ class WebRTCClient:
         asyncio.ensure_future(self.conn.send(msg))
 
     def start_pipeline(self):
-        def link_pads(pay_caps, webrtc):
-            print("Linking RTP pad to webrtcbin...")
-            rtp_src_pad = pay_caps.get_static_pad("src")
-            webrtc_sink_pad = webrtc.get_request_pad("send_rtp_sink_0")
+    def link_pads():
+        print("🔗 Linking RTP pad to webrtcbin...")
+        rtp_src_pad = self.pay_caps.get_static_pad("src")
+        webrtc_sink_pad = self.webrtc.get_request_pad("send_rtp_sink_0")
 
-            if not webrtc_sink_pad:
-                raise Exception("Failed to get webrtcbin send_rtp_sink_%u pad")
+        if not webrtc_sink_pad:
+            raise Exception("❌ Failed to get webrtcbin send_rtp_sink_0 pad")
 
-            if rtp_src_pad.link(webrtc_sink_pad) != Gst.PadLinkReturn.OK:
-                raise Exception("Failed to link RTP src pad to webrtcbin sink pad")
+        if rtp_src_pad.link(webrtc_sink_pad) != Gst.PadLinkReturn.OK:
+            raise Exception("❌ Failed to link RTP src pad to webrtcbin")
 
-            print("RTP pad linked successfully")
+        print("✅ RTP pad linked successfully")
 
-        # Create pipeline and elements
-        self.pipe = Gst.Pipeline.new("webrtc-pipeline")
+    # Create pipeline and elements
+    self.pipe = Gst.Pipeline.new("webrtc-pipeline")
 
-        # Camera source
-        source = Gst.ElementFactory.make("nvarguscamerasrc", "source")
-        source.set_property("sensor-id", 0)
+    source = Gst.ElementFactory.make("nvarguscamerasrc", "source")
+    source.set_property("sensor-id", 0)
 
-        # Caps to negotiate with nvarguscamerasrc
-        caps_filter = Gst.ElementFactory.make("capsfilter", "caps")
-        caps = Gst.Caps.from_string("video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1")
-        caps_filter.set_property("caps", caps)
+    caps_filter = Gst.ElementFactory.make("capsfilter", "caps")
+    caps = Gst.Caps.from_string("video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1")
+    caps_filter.set_property("caps", caps)
 
-        # Convert and encode
-        conv = Gst.ElementFactory.make("nvvidconv", "converter")
-        conv_caps = Gst.ElementFactory.make("capsfilter", "conv_caps")
-        conv_caps.set_property("caps", Gst.Caps.from_string("video/x-raw,format=I420"))
+    conv = Gst.ElementFactory.make("nvvidconv", "converter")
+    conv_caps = Gst.ElementFactory.make("capsfilter", "conv_caps")
+    conv_caps.set_property("caps", Gst.Caps.from_string("video/x-raw,format=I420"))
 
-        enc = Gst.ElementFactory.make("nvv4l2h264enc", "encoder")
-        enc.set_property("insert-sps-pps", True)
-        enc.set_property("bitrate", 4000000)
-        enc.set_property("preset-level", 1)
-        enc.set_property("idrinterval", 1)
-        enc.set_property("maxperf-enable", True)
+    enc = Gst.ElementFactory.make("nvv4l2h264enc", "encoder")
+    enc.set_property("insert-sps-pps", True)
+    enc.set_property("bitrate", 4000000)
+    enc.set_property("preset-level", 1)
+    enc.set_property("idrinterval", 1)
+    enc.set_property("maxperf-enable", True)
 
-        parse = Gst.ElementFactory.make("h264parse", "parser")
-        pay = Gst.ElementFactory.make("rtph264pay", "payloader")
-        pay.set_property("config-interval", 1)
+    parse = Gst.ElementFactory.make("h264parse", "parser")
+    pay = Gst.ElementFactory.make("rtph264pay", "payloader")
+    pay.set_property("config-interval", 1)
 
-        # RTP caps
-        pay_caps = Gst.ElementFactory.make("capsfilter", "pay_caps")
-        pay_caps.set_property("caps", Gst.Caps.from_string(
-            "application/x-rtp,media=video,encoding-name=H264,payload=96"
-        ))
+    pay_caps = Gst.ElementFactory.make("capsfilter", "pay_caps")
+    pay_caps.set_property("caps", Gst.Caps.from_string(
+        "application/x-rtp,media=video,encoding-name=H264,payload=96"
+    ))
 
-        # WebRTC bin
-        webrtc = Gst.ElementFactory.make("webrtcbin", "sendrecv")
-        webrtc.set_property("stun-server", "stun://stun.l.google.com:19302")
+    webrtc = Gst.ElementFactory.make("webrtcbin", "sendrecv")
+    webrtc.set_property("stun-server", "stun://stun.l.google.com:19302")
 
-        # Add all elements
-        for element in [source, caps_filter, conv, conv_caps, enc, parse, pay, pay_caps, webrtc]:
-            self.pipe.add(element)
+    for element in [source, caps_filter, conv, conv_caps, enc, parse, pay, pay_caps, webrtc]:
+        self.pipe.add(element)
 
-        # Link static parts of pipeline
-        source.link(caps_filter)
-        caps_filter.link(conv)
-        conv.link(conv_caps)
-        conv_caps.link(enc)
-        enc.link(parse)
-        parse.link(pay)
-        pay.link(pay_caps)
+    source.link(caps_filter)
+    caps_filter.link(conv)
+    conv.link(conv_caps)
+    conv_caps.link(enc)
+    enc.link(parse)
+    parse.link(pay)
+    pay.link(pay_caps)
 
-        # Start playing
-        self.pipe.set_state(Gst.State.PLAYING)
-        asyncio.get_event_loop().call_later(5, lambda: link_pads(pay_caps, webrtc))
+    self.webrtc = webrtc
+    self.pay_caps = pay_caps
 
-        self.webrtc = self.pipe.get_by_name('sendrecv')
-        self.webrtc.connect('on-negotiation-needed', self.on_negotiation_needed)
-        self.webrtc.connect('on-ice-candidate', self.send_ice_candidate)
+    self.webrtc.connect('on-negotiation-needed', self.on_negotiation_needed)
+    self.webrtc.connect('on-ice-candidate', self.send_ice_candidate)
+
+    # Start pipeline
+    self.pipe.set_state(Gst.State.PLAYING)
+
+    # Call later with bound state
+    asyncio.get_event_loop().call_later(0.5, link_pads)
 
     async def loop(self):
         async for message in self.conn:
