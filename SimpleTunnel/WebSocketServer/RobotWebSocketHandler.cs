@@ -3,7 +3,7 @@ using System.Net.WebSockets;
 
 namespace WebSocketServer
 {
-    internal class RobotWebSocketHandler
+    internal class RobotWebSocketHandler(ILogger<RobotWebSocketHandler> logger)
     {
         private const int BufferMaxSize = 65536;
 
@@ -47,14 +47,14 @@ namespace WebSocketServer
 
                 default:
                     context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    Console.WriteLine("Could not find viable path: " + context.Request.Path);
+                    logger.LogWarning("Could not find viable path: " + context.Request.Path);
                     break;
             }
         }
 
         private async Task StartRobotProcess()
         {
-            Console.WriteLine("Starting robot process");
+            logger.LogInformation("Starting robot process");
             try
             {
                 if (_robot is null)
@@ -76,7 +76,7 @@ namespace WebSocketServer
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                logger.LogError(e.Message);
             }
             finally
             {
@@ -87,7 +87,7 @@ namespace WebSocketServer
 
         private async Task StartControllerProcess()
         {
-            Console.WriteLine("Starting controller process (oculus)");
+            logger.LogInformation("Starting controller process (oculus)");
             try
             {
                 if (_controller is null)
@@ -112,7 +112,7 @@ namespace WebSocketServer
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                logger.LogError(e.Message);
             }
             finally
             {
