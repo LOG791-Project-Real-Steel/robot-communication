@@ -37,13 +37,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 
+app.MapGet("/ping", () => Results.Text("pong"));
+
 // Disabling https for now
 // app.UseHttpsRedirection();
 
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
 
 await Task.WhenAll(robotController.Processes);

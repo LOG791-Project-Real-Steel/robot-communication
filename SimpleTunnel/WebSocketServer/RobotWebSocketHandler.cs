@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.WebSockets;
+using System.Text;
 
 namespace WebSocketServer
 {
@@ -43,6 +44,11 @@ namespace WebSocketServer
                     _robot = await context.WebSockets.AcceptWebSocketAsync();
                     _robotTask = StartRobotProcess();
                     await _robotTask;
+                    break;
+                
+                case "/ping":                                   // stand-alone ping socket
+                    var pingSock = await context.WebSockets.AcceptWebSocketAsync();
+                    _ = HandlePingBridgeAsync(pingSock);    // fire-and-forget
                     break;
 
                 default:
@@ -121,6 +127,66 @@ namespace WebSocketServer
             }
         }
 
+        private async Task HandlePingBridgeAsync(WebSocket socket)
+        {
+            logger.LogInformation("Ping bridge connected");
+            try
+            {
+                var buffer = new byte[BufferMaxSize];
+
+                while (socket.State == WebSocketState.Open)
+                {
+                    var result = await socket.ReceiveAsync(buffer, CancellationToken.None);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        await socket.CloseAsync(result.CloseStatus!.Value, result.CloseStatusDescription,
+                                                CancellationToken.None);
+                        break;
+                    }
+
+                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    if (msg.Equals("ping", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool ok  = await PingRobotAsync();
+                        string r = ok ? "pong" : "timeout";
+                        await socket.SendAsync(Encoding.UTF8.GetBytes(r), WebSocketMessageType.Text, true,
+                                               CancellationToken.None);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Ping bridge crashed");
+            }
+            finally
+            {
+                try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Bye", CancellationToken.None); }
+                catch { /* ignore */ }
+                socket.Dispose();
+            }
+        }
+
+        private async Task<bool> PingRobotAsync()
+        {
+            try
+            {
+                if (_robot is null || _robot.CloseStatus.HasValue) return false;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+                await _robot.SendAsync(ArraySegment<byte>.Empty,
+                                       (WebSocketMessageType)0x9,
+                                       true,
+                                       cts.Token);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
         private static byte[] TrimEnd(byte[] array)
         {
             var lastIndex = Array.FindLastIndex(array, b => b != 0);
