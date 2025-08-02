@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 
@@ -10,9 +11,13 @@ namespace WebSocketServer
 
         private WebSocket? _robot;
         private WebSocket? _controller;
-
+        private WebSocket? _robotPing;
+        private WebSocket? _controllerPing;
+        
         private Task _robotTask = Task.CompletedTask;
         private Task _controllerTask = Task.CompletedTask;
+        private Task _robotPingTask = Task.CompletedTask;
+        private Task _controllerPingTask = Task.CompletedTask;
 
         public IEnumerable<Task> Processes
         {
@@ -20,47 +25,56 @@ namespace WebSocketServer
             {
                 yield return _robotTask;
                 yield return _controllerTask;
+                yield return _robotPingTask;
+                yield return _controllerPingTask;
             }
         }
 
-        public async Task Handle(HttpContext context, Func<Task> next)
+        public async Task Handle(HttpContext ctx, Func<Task> next)
         {
-            if (!context.WebSockets.IsWebSocketRequest)
+            if (!ctx.WebSockets.IsWebSocketRequest)
             {
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                ctx.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 await next();
                 return;
             }
 
-            switch (context.Request.Path)
+            switch (ctx.Request.Path)
             {
                 case "/oculus":
-                    _controller = await context.WebSockets.AcceptWebSocketAsync();
+                    _controller = await ctx.WebSockets.AcceptWebSocketAsync();
                     _controllerTask = StartControllerProcess();
                     await _controllerTask;
                     break;
-
+                
+                case "/oculus/ping":
+                    _controllerPing = await ctx.WebSockets.AcceptWebSocketAsync();
+                    _controllerPingTask = StartControllerProcess("oculus ping");
+                    await _controllerPingTask;
+                    break;
+                
                 case "/robot":
-                    _robot = await context.WebSockets.AcceptWebSocketAsync();
+                    _robot = await ctx.WebSockets.AcceptWebSocketAsync();
                     _robotTask = StartRobotProcess();
                     await _robotTask;
                     break;
                 
-                case "/ping":                                   // stand-alone ping socket
-                    var pingSock = await context.WebSockets.AcceptWebSocketAsync();
-                    _ = HandlePingBridgeAsync(pingSock);    // fire-and-forget
+                case "/robot/ping":
+                    _robotPing = await ctx.WebSockets.AcceptWebSocketAsync();
+                    _robotPingTask = StartRobotProcess("robot ping");
+                    await _robotPingTask;
                     break;
-
+                
                 default:
-                    context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    logger.LogWarning("Could not find viable path: " + context.Request.Path);
+                    ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    logger.LogWarning($"Could not find viable path: {ctx.Request.Path}");
                     break;
             }
         }
 
-        private async Task StartRobotProcess()
+        private async Task StartRobotProcess(string type="robot")
         {
-            logger.LogInformation("Starting robot process");
+            logger.LogInformation($"Starting {type} process");
             try
             {
                 if (_robot is null)
@@ -91,9 +105,9 @@ namespace WebSocketServer
             }
         }
 
-        private async Task StartControllerProcess()
+        private async Task StartControllerProcess(string type="oculus")
         {
-            logger.LogInformation("Starting controller process (oculus)");
+            logger.LogInformation($"Starting controller process ({type})");
             try
             {
                 if (_controller is null)
@@ -124,66 +138,6 @@ namespace WebSocketServer
             {
                 _controller?.Dispose();
                 _controller = null;
-            }
-        }
-
-        private async Task HandlePingBridgeAsync(WebSocket socket)
-        {
-            logger.LogInformation("Ping bridge connected");
-            try
-            {
-                var buffer = new byte[BufferMaxSize];
-
-                while (socket.State == WebSocketState.Open)
-                {
-                    var result = await socket.ReceiveAsync(buffer, CancellationToken.None);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        await socket.CloseAsync(result.CloseStatus!.Value, result.CloseStatusDescription,
-                                                CancellationToken.None);
-                        break;
-                    }
-
-                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    if (msg.Equals("ping", StringComparison.OrdinalIgnoreCase))
-                    {
-                        bool ok  = await PingRobotAsync();
-                        string r = ok ? "pong" : "timeout";
-                        await socket.SendAsync(Encoding.UTF8.GetBytes(r), WebSocketMessageType.Text, true,
-                                               CancellationToken.None);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Ping bridge crashed");
-            }
-            finally
-            {
-                try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Bye", CancellationToken.None); }
-                catch { /* ignore */ }
-                socket.Dispose();
-            }
-        }
-
-        private async Task<bool> PingRobotAsync()
-        {
-            try
-            {
-                if (_robot is null || _robot.CloseStatus.HasValue) return false;
-
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-                await _robot.SendAsync(ArraySegment<byte>.Empty,
-                                       (WebSocketMessageType)0x9,
-                                       true,
-                                       cts.Token);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
         
