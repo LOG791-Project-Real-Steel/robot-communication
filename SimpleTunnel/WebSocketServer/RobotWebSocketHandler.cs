@@ -7,20 +7,18 @@ namespace WebSocketServer
     {
         private const int BufferMaxSize = 65536;
 
-        private WebSocket? robot = null;
-        private HttpContext? robotContext = null;
-        private WebSocket? controller = null;
-        private HttpContext? controllerContext = null;
+        private WebSocket? _robot;
+        private WebSocket? _controller;
 
-        private Task robotTask = Task.CompletedTask;
-        private Task controllerTask = Task.CompletedTask;
+        private Task _robotTask = Task.CompletedTask;
+        private Task _controllerTask = Task.CompletedTask;
 
         public IEnumerable<Task> Processes
         {
             get
             {
-                yield return robotTask;
-                yield return controllerTask;
+                yield return _robotTask;
+                yield return _controllerTask;
             }
         }
 
@@ -36,101 +34,96 @@ namespace WebSocketServer
             switch (context.Request.Path)
             {
                 case "/oculus":
-                    controller = await context.WebSockets.AcceptWebSocketAsync();
-                    controllerContext = context;
-                    controllerTask = StartControllerProcess();
-                    await controllerTask;
+                    _controller = await context.WebSockets.AcceptWebSocketAsync();
+                    _controllerTask = StartControllerProcess();
+                    await _controllerTask;
                     break;
 
                 case "/robot":
-                    robot = await context.WebSockets.AcceptWebSocketAsync();
-                    robotContext = context;
-                    robotTask = StartRobotProcess();
-                    await robotTask;
+                    _robot = await context.WebSockets.AcceptWebSocketAsync();
+                    _robotTask = StartRobotProcess();
+                    await _robotTask;
                     break;
 
                 default:
                     context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    Console.WriteLine("Could not find viable path: " + context.Request.Path);
                     break;
             }
         }
 
         private async Task StartRobotProcess()
         {
+            Console.WriteLine("Starting robot process");
             try
             {
-                if (robot is null)
+                if (_robot is null)
                     return;
 
                 byte[] buffer = new byte[BufferMaxSize];
-                WebSocketReceiveResult result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                WebSocketReceiveResult result = await _robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                 buffer = TrimEnd(buffer);
 
-                if (result is not null)
+                while (!result.CloseStatus.HasValue)
                 {
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        if (controller is not null && !controller.CloseStatus.HasValue)
-                            await controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                    if (_controller is not null && !_controller.CloseStatus.HasValue)
+                        await _controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
 
-                        buffer = new byte[BufferMaxSize];
-                        result = await robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
+                    buffer = new byte[BufferMaxSize];
+                    result = await _robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                    buffer = TrimEnd(buffer);
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // TODO: Add logger to log error.
+                Console.WriteLine(e.Message);
             }
             finally
             {
-                robot?.Dispose();
-                robot = null;
+                _robot?.Dispose();
+                _robot = null;
             }
         }
 
         private async Task StartControllerProcess()
         {
+            Console.WriteLine("Starting controller process (oculus)");
             try
             {
-                if (controller is null)
+                if (_controller is null)
                     return;
 
                 byte[] buffer = new byte[BufferMaxSize];
-                WebSocketReceiveResult result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                WebSocketReceiveResult result = await _controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                 buffer = TrimEnd(buffer);
 
-                if (result is not null)
+                while (!result.CloseStatus.HasValue)
                 {
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        if (robot is not null && !robot.CloseStatus.HasValue)
-                            await robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                    if (_robot is not null && !_robot.CloseStatus.HasValue)
+                        await _robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType, result.EndOfMessage, CancellationToken.None);
 
-                        buffer = new byte[BufferMaxSize];
-                        result = await controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
-                    await controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                    controller.Dispose();
-                    controller = null;
+                    buffer = new byte[BufferMaxSize];
+                    result = await _controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                    buffer = TrimEnd(buffer);
                 }
+                await _controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                _controller.Dispose();
+                _controller = null;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // TODO: Add logger to log error.
+                Console.WriteLine(e.Message);
             }
             finally
             {
-                controller?.Dispose();
-                controller = null;
+                _controller?.Dispose();
+                _controller = null;
             }
         }
 
         private static byte[] TrimEnd(byte[] array)
         {
-            int lastIndex = Array.FindLastIndex(array, b => b != 0);
+            var lastIndex = Array.FindLastIndex(array, b => b != 0);
 
             Array.Resize(ref array, lastIndex + 1);
 
