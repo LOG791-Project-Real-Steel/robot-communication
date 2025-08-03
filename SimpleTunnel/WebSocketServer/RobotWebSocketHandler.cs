@@ -5,26 +5,26 @@ namespace WebSocketServer
 {
     internal class RobotWebSocketHandler(ILogger<RobotWebSocketHandler> logger)
     {
-        private const int BufferMaxSize = 65536;
-
+        private const int BufferMaxSize = 65_536;
+        
         private WebSocket? _robot;
-        private WebSocket? _controller;
+        private WebSocket? _oculus;
         private WebSocket? _robotPing;
-        private WebSocket? _controllerPing;
+        private WebSocket? _oculusPing;
         
         private Task _robotTask = Task.CompletedTask;
-        private Task _controllerTask = Task.CompletedTask;
+        private Task _oculusTask = Task.CompletedTask;
         private Task _robotPingTask = Task.CompletedTask;
-        private Task _controllerPingTask = Task.CompletedTask;
+        private Task _oculusPingTask = Task.CompletedTask;
 
         public IEnumerable<Task> Processes
         {
             get
             {
                 yield return _robotTask;
-                yield return _controllerTask;
+                yield return _oculusTask;
                 yield return _robotPingTask;
-                yield return _controllerPingTask;
+                yield return _oculusPingTask;
             }
         }
 
@@ -37,36 +37,95 @@ namespace WebSocketServer
                 return;
             }
 
+            var port = ctx.Connection.LocalPort;
+            var ws = await ctx.WebSockets.AcceptWebSocketAsync();
+            var pre = $"[{port}] ";
+
             switch (ctx.Request.Path)
             {
-                case "/oculus":
-                    _controller = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _controllerTask = StartControllerProcess();
-                    await _controllerTask;
-                    break;
-                
-                case "/oculus/ping":
-                    _controllerPing = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _controllerPingTask = StartControllerProcess("oculus ping");
-                    await _controllerPingTask;
-                    break;
-                
                 case "/robot":
-                    _robot = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _robotTask = StartRobotProcess();
+                    _robot     = ws;
+                    _robotTask = RelayLoop(_robot, () => _oculus, pre + "robot");
                     await _robotTask;
                     break;
-                
+
+                case "/oculus":
+                    _oculus = ws;
+                    _oculusTask = RelayLoop(_oculus, () => _robot, pre + "oculus");
+                    await _oculusTask;
+                    break;
+
                 case "/robot/ping":
-                    _robotPing = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _robotPingTask = StartRobotProcess("robot ping");
+                    _robotPing  = ws;
+                    _robotPingTask = RelayLoop(_robotPing, () => _oculusPing, pre + "robot ping");
                     await _robotPingTask;
                     break;
-                
+
+                case "/oculus/ping":
+                    _oculusPing = ws;
+                    _oculusPingTask = RelayLoop(_oculusPing, () => _robotPing, pre + "oculus ping");
+                    await _oculusPingTask;
+                    break;
+
                 default:
                     ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    logger.LogWarning("Could not find viable path: {Path}", ctx.Request.Path);
+                    logger.LogWarning($"{pre}unknown path {{Path}}", ctx.Request.Path);
                     break;
+            }
+        }
+
+        private async Task RelayLoop(WebSocket source,
+            Func<WebSocket?> target,
+            string logName)
+        {
+            logger.LogInformation($"{logName} connected");
+
+            try
+            {
+                var buffer = new byte[BufferMaxSize];
+
+                while (source.State == WebSocketState.Open)
+                {
+                    var res = await source.ReceiveAsync(buffer, CancellationToken.None);
+
+                    if (res.MessageType == WebSocketMessageType.Close)
+                        break;
+
+                    WebSocket? dst = target();
+                    if (dst is not null && dst.State == WebSocketState.Open)
+                    {
+                        await dst.SendAsync(buffer.AsMemory(..res.Count),
+                            res.MessageType,
+                            res.EndOfMessage,
+                            CancellationToken.None);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"{logName} relay crashed");
+            }
+            finally
+            {
+                try
+                {
+                    await source.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+                }
+                catch
+                {
+                    /* ignore */
+                }
+
+                source.Dispose();
+                logger.LogInformation($"{logName} disconnected");
+
+                switch (logName)
+                {
+                    case not null when logName.Contains("robot ping"): _robotPing = null; break;
+                    case not null when logName.Contains("oculus ping"): _oculusPing = null; break;
+                    case not null when logName.Contains("robot"): _robot = null; break;
+                    case not null when logName.Contains("oculus"): _oculus = null; break;
+                }
             }
         }
 
@@ -86,8 +145,8 @@ namespace WebSocketServer
 
                     while (!result.CloseStatus.HasValue)
                     {
-                        if (_controller is not null && !_controller.CloseStatus.HasValue)
-                            await _controller.SendAsync(new ArraySegment<byte>(buffer), result.MessageType,
+                        if (_oculus is not null && !_oculus.CloseStatus.HasValue)
+                            await _oculus.SendAsync(new ArraySegment<byte>(buffer), result.MessageType,
                                 result.EndOfMessage, CancellationToken.None);
 
                         buffer = new byte[BufferMaxSize];
@@ -107,16 +166,15 @@ namespace WebSocketServer
                         if (txt.Equals("ping", StringComparison.OrdinalIgnoreCase))
                         {
                             stopWatch.Restart();
-                            logger.LogDebug("Robot → Oculus ping");
                         }
                         else if (txt.Equals("pong", StringComparison.OrdinalIgnoreCase))
                         {
                             stopWatch.Stop();
-                            logger.LogInformation("RTT Robot↔Oculus {Elapsed} ms", stopWatch.ElapsedMilliseconds);
+                            logger.LogInformation("RTT Robot ↔ Oculus {Elapsed} ms", stopWatch.ElapsedMilliseconds);
                         }
                         
-                        if (_controllerPing is not null && !_controllerPing.CloseStatus.HasValue)
-                            await _controllerPing.SendAsync(
+                        if (_oculusPing is not null && !_oculusPing.CloseStatus.HasValue)
+                            await _oculusPing.SendAsync(
                                 new ArraySegment<byte>(buffer), result.MessageType,
                                 result.EndOfMessage, CancellationToken.None);
 
@@ -128,7 +186,7 @@ namespace WebSocketServer
             }
             catch (Exception e)
             {
-                logger.LogError(e.Message);
+                logger.LogError(e, "Robot process error");
             }
             finally
             {
@@ -148,10 +206,10 @@ namespace WebSocketServer
             {
                 byte[] buffer = new byte[BufferMaxSize];
 
-                if (_controller is not null)
+                if (_oculus is not null)
                 {
                     WebSocketReceiveResult result =
-                        await _controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        await _oculus.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                     buffer = TrimEnd(buffer);
 
                     while (!result.CloseStatus.HasValue)
@@ -161,17 +219,17 @@ namespace WebSocketServer
                                 result.EndOfMessage, CancellationToken.None);
 
                         buffer = new byte[BufferMaxSize];
-                        result = await _controller.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        result = await _oculus.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                         buffer = TrimEnd(buffer);
                     }
 
-                    await _controller.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                    _controller.Dispose();
-                    _controller = null;
+                    await _oculus.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                    _oculus.Dispose();
+                    _oculus = null;
                 }
-                else if (_controllerPing is not null)
+                else if (_oculusPing is not null)
                 {
-                    WebSocketReceiveResult result = await _controllerPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                    WebSocketReceiveResult result = await _oculusPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                     buffer = TrimEnd(buffer);
 
                     while (!result.CloseStatus.HasValue)
@@ -181,7 +239,6 @@ namespace WebSocketServer
                         if (txt.Equals("ping", StringComparison.OrdinalIgnoreCase))
                         {
                             stopWatch.Restart();
-                            logger.LogDebug("Oculus → Robot ping");
                         }
                         else if (txt.Equals("pong", StringComparison.OrdinalIgnoreCase))
                         {
@@ -195,12 +252,12 @@ namespace WebSocketServer
 
 
                         buffer = new byte[BufferMaxSize];
-                        result = await _controllerPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        result = await _oculusPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                         buffer = TrimEnd(buffer);
                     }
-                    await _controllerPing.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                    _controllerPing.Dispose();
-                    _controllerPing = null;
+                    await _oculusPing.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+                    _oculusPing.Dispose();
+                    _oculusPing = null;
                 }
             }
             catch (Exception e)
@@ -209,10 +266,10 @@ namespace WebSocketServer
             }
             finally
             {
-                _controller?.Dispose();
-                _controller = null;
-                _controllerPing.Dispose();
-                _controllerPing = null;
+                _oculus?.Dispose();
+                _oculus = null;
+                _oculusPing?.Dispose();
+                _oculusPing = null;
             }
         }
         

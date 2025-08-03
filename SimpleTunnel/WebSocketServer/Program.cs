@@ -35,8 +35,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 
-app.MapGet("/ping", () => Results.Text("pong"));
-
 // Disabling https for now
 // app.UseHttpsRedirection();
 
