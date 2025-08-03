@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -43,32 +43,143 @@ namespace WebSocketServer
             {
                 case "/oculus":
                     _controller = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _controllerTask = StartControllerProcess();
-                    await _controllerTask;
+                    _controllerTask = Bridge(_controller, () => _robot, "oculus → robot");
                     break;
-                
-                case "/oculus/ping":
-                    _controllerPing = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _controllerPingTask = StartControllerProcess("oculus ping");
-                    await _controllerPingTask;
-                    break;
-                
+
                 case "/robot":
                     _robot = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _robotTask = StartRobotProcess();
-                    await _robotTask;
+                    _robotTask = Bridge(_robot, () => _controller, "robot  → oculus");
                     break;
-                
+
+                case "/oculus/ping":
+                    _controllerPing = await ctx.WebSockets.AcceptWebSocketAsync();
+                    _controllerPingTask = BridgePing(_controllerPing, () => _robotPing, "oculus-ping → robot-ping");
+                    break;
+
                 case "/robot/ping":
                     _robotPing = await ctx.WebSockets.AcceptWebSocketAsync();
-                    _robotPingTask = StartRobotProcess("robot ping");
-                    await _robotPingTask;
+                    _robotPingTask = BridgePing(_robotPing, () => _controllerPing, "robot-ping → oculus-ping");
                     break;
                 
                 default:
                     ctx.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    logger.LogWarning($"Could not find viable path: {ctx.Request.Path}");
+                    logger.LogWarning("Unknown webSocket path {Path}", ctx.Request.Path);
                     break;
+            }
+        }
+        
+        private Task Bridge(WebSocket source, Func<WebSocket?> destSelector, string label) =>
+            Task.Run(async () =>
+            {
+                logger.LogInformation("[{Label}] bridge started", label);
+
+                var buffer = new byte[BufferMaxSize];
+
+                try
+                {
+                    while (source.State == WebSocketState.Open)
+                    {
+                        var result =
+                            await source.ReceiveAsync(buffer, CancellationToken.None);
+
+                        if (result.CloseStatus.HasValue)
+                            break;
+
+                        WebSocket? dest = destSelector();
+                        if (dest is not null && dest.State == WebSocketState.Open)
+                        {
+                            await dest.SendAsync(
+                                new ArraySegment<byte>(buffer, 0, result.Count),
+                                result.MessageType,
+                                result.EndOfMessage,
+                                CancellationToken.None);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[{Label}] bridge error", label);
+                }
+                finally
+                {
+                    logger.LogInformation("[{Label}] bridge stopped", label);
+                    await CloseQuietly(source);
+                }
+            });
+        
+        private Task BridgePing(WebSocket source,
+                                Func<WebSocket?> destSelector,
+                                string label) =>
+            Task.Run(async () =>
+            {
+                logger.LogInformation("[{Label}] ping bridge started", label);
+                var sw     = new Stopwatch();
+                var buffer = new byte[BufferMaxSize];
+
+                try
+                {
+                    while (source.State == WebSocketState.Open)
+                    {
+                        var result =
+                            await source.ReceiveAsync(buffer, CancellationToken.None);
+
+                        if (result.CloseStatus.HasValue)
+                            break;
+
+                        string text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+                        if (text.Equals("ping", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // ping came FROM this socket; start RTT timer
+                            sw.Restart();
+                            logger.LogDebug("[{Label}] → ping", label);
+                        }
+                        else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // pong came back TO this socket; stop and log RTT
+                            sw.Stop();
+                            logger.LogInformation(
+                                "[{Label}] ← pong (RTT {Elapsed} ms)",
+                                label,
+                                sw.ElapsedMilliseconds);
+                        }
+
+                        WebSocket? dest = destSelector();
+                        if (dest is not null && dest.State == WebSocketState.Open)
+                        {
+                            await dest.SendAsync(
+                                new ArraySegment<byte>(buffer, 0, result.Count),
+                                result.MessageType,
+                                result.EndOfMessage,
+                                CancellationToken.None);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[{Label}] ping bridge error", label);
+                }
+                finally
+                {
+                    logger.LogInformation("[{Label}] ping bridge stopped", label);
+                    await CloseQuietly(source);
+                }
+            });
+
+        private static async Task CloseQuietly(WebSocket ws)
+        {
+            try
+            {
+                if (ws.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                    await ws.CloseAsync(
+                        WebSocketCloseStatus.NormalClosure,
+                        "closing",
+                        CancellationToken.None);
+            }
+            catch { /* swallow */ }
+            finally
+            {
+                ws.Dispose();
             }
         }
 
