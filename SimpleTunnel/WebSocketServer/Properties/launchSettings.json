@@ -30,6 +30,16 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "PORT": "8765"
       }
+    },
+    "server2": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://[::]:8764",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "PORT": "8764"
+      }
     }
   }
 }
