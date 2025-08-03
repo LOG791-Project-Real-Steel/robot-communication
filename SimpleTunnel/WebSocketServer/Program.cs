@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Console;
 using WebSocketServer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,14 +13,11 @@ builder.Services.AddSingleton<RobotWebSocketHandler>();
 
 // Clear logs
 builder.Logging.ClearProviders();
-builder.Logging.AddSimpleConsole(opts =>
-{
-    opts.SingleLine = true;
-    // e.g. 2025-08-02 14:35:07.123 –
-    opts.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff ";
-    // Use local time; switch to true for UTC
-    opts.UseUtcTimestamp = false;
-});
+builder.Logging
+    // pick the custom formatter
+    .AddConsole(o => o.FormatterName = MessageOnlyConsoleFormatter.Name)
+    // register it
+    .AddConsoleFormatter<MessageOnlyConsoleFormatter, ConsoleFormatterOptions>();
 
 var app = builder.Build();
 
