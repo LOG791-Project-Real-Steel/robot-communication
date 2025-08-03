@@ -101,6 +101,15 @@ namespace WebSocketServer
                     }
                 }
             }
+            catch (WebSocketException wse) when
+                (wse.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
+            {
+                logger.LogInformation($"{logName} remote closed connection");
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation($"{logName} cancelled");
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, $"{logName} relay crashed");
@@ -127,159 +136,6 @@ namespace WebSocketServer
                     case not null when logName.Contains("oculus"): _oculus = null; break;
                 }
             }
-        }
-
-        private async Task StartRobotProcess(string type = "robot")
-        {
-            logger.LogInformation("Starting {Type} process", type);
-            var stopWatch = new System.Diagnostics.Stopwatch();
-
-            try
-            {
-                byte[] buffer = new byte[BufferMaxSize];
-                if (_robot is not null)
-                {
-                    WebSocketReceiveResult result =
-                        await _robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
-
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        if (_oculus is not null && !_oculus.CloseStatus.HasValue)
-                            await _oculus.SendAsync(new ArraySegment<byte>(buffer), result.MessageType,
-                                result.EndOfMessage, CancellationToken.None);
-
-                        buffer = new byte[BufferMaxSize];
-                        result = await _robot.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
-                }
-                else if (_robotPing is not null)
-                {
-                    WebSocketReceiveResult result =
-                        await _robotPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
-
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        string txt = System.Text.Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        if (txt.Equals("ping", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stopWatch.Restart();
-                        }
-                        else if (txt.Equals("pong", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stopWatch.Stop();
-                            logger.LogInformation("RTT Robot ↔ Oculus {Elapsed} ms", stopWatch.ElapsedMilliseconds);
-                        }
-                        
-                        if (_oculusPing is not null && !_oculusPing.CloseStatus.HasValue)
-                            await _oculusPing.SendAsync(
-                                new ArraySegment<byte>(buffer), result.MessageType,
-                                result.EndOfMessage, CancellationToken.None);
-
-                        buffer = new byte[BufferMaxSize];
-                        result = await _robotPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Robot process error");
-            }
-            finally
-            {
-                _robot?.Dispose();
-                _robot = null;
-                _robotPing?.Dispose();
-                _robotPing = null;
-            }
-        }
-
-        private async Task StartControllerProcess(string type = "oculus")
-        {
-            logger.LogInformation("Starting {Type} process", type);
-            var stopWatch = new System.Diagnostics.Stopwatch();
-            
-            try
-            {
-                byte[] buffer = new byte[BufferMaxSize];
-
-                if (_oculus is not null)
-                {
-                    WebSocketReceiveResult result =
-                        await _oculus.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
-
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        if (_robot is not null && !_robot.CloseStatus.HasValue)
-                            await _robot.SendAsync(new ArraySegment<byte>(buffer), result.MessageType,
-                                result.EndOfMessage, CancellationToken.None);
-
-                        buffer = new byte[BufferMaxSize];
-                        result = await _oculus.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
-
-                    await _oculus.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                    _oculus.Dispose();
-                    _oculus = null;
-                }
-                else if (_oculusPing is not null)
-                {
-                    WebSocketReceiveResult result = await _oculusPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                    buffer = TrimEnd(buffer);
-
-                    while (!result.CloseStatus.HasValue)
-                    {
-                        string txt = System.Text.Encoding.UTF8.GetString(buffer, 0, result.Count);
-
-                        if (txt.Equals("ping", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stopWatch.Restart();
-                        }
-                        else if (txt.Equals("pong", StringComparison.OrdinalIgnoreCase))
-                        {
-                            stopWatch.Stop();
-                            logger.LogInformation("RTT Oculus↔Robot {Elapsed} ms", stopWatch.ElapsedMilliseconds);
-                        }
-
-                        if (_robotPing is not null && !_robotPing.CloseStatus.HasValue)
-                            await _robotPing.SendAsync(new ArraySegment<byte>(buffer), result.MessageType,
-                                result.EndOfMessage, CancellationToken.None);
-
-
-                        buffer = new byte[BufferMaxSize];
-                        result = await _oculusPing.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                        buffer = TrimEnd(buffer);
-                    }
-                    await _oculusPing.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
-                    _oculusPing.Dispose();
-                    _oculusPing = null;
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e.Message);
-            }
-            finally
-            {
-                _oculus?.Dispose();
-                _oculus = null;
-                _oculusPing?.Dispose();
-                _oculusPing = null;
-            }
-        }
-        
-        private static byte[] TrimEnd(byte[] array)
-        {
-            var lastIndex = Array.FindLastIndex(array, b => b != 0);
-
-            Array.Resize(ref array, lastIndex + 1);
-
-            return array;
         }
     }
 }
