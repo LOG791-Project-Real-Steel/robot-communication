@@ -8,7 +8,7 @@
 
 Code that will run on the middleware server between the robot and the oculus headset.
 
-## SimpleTunnel
+## SimpleTunnel (Used for WebSocket final solution)
 
 There are a bunch of projects and artifacts from trial and errors ,made during the conception of our final solution. Feel free to explore other C# projects made in this folder as they have somewhat valid code used mostly for testing. These folders will not be covered by this README.
 
@@ -83,6 +83,14 @@ Code that is not the middleware server but, is helpful to control the robot loca
     ```bash
     go run sender.go
     ```
+
+## WebRTC (For WbRTC solution tests)
+
+This was used for testing the WebRTC solution. Unfortunately, due to hardware limitations, we could not make this solution work thus, this folder is not maintained and the code in it is not clean or organized at all. You can try to make sense of it but it will not be explained in this README.
+
+This code might not even run at all.
+
+These scripts were executed and tested on the robot directly.
 
 ---
 

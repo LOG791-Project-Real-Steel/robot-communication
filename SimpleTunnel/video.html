@@ -48,7 +48,6 @@
         const urlCreator = window.URL || window.webkitURL;
         const video = document.getElementById('video');
         const ws = new WebSocket('ws://localhost:5000/oculus');
-        // const ws = new WebSocket('ws://74.56.22.147:8765/oculus');
         ws.binaryType = 'arraybuffer'; // Set binary type to receive ArrayBuffer
 
         const throttleMod = 0.20;

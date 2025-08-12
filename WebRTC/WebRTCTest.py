@@ -135,7 +135,6 @@ class WebRTCClient:
         self.webrtc.connect('on-negotiation-needed', self.on_negotiation_needed)
         self.webrtc.connect('on-ice-candidate', self.send_ice_candidate)
 
-
     async def loop(self):
         async for message in self.conn:
             msg = json.loads(message)
