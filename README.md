@@ -12,6 +12,11 @@ Code that will run on the middleware server between the robot and the oculus hea
 
 There are a bunch of projects and artifacts from trial and errors ,made during the conception of our final solution. Feel free to explore other C# projects made in this folder as they have somewhat valid code used mostly for testing. These folders will not be covered by this README.
 
+### Prerequisites
+
+- .NET 9 sdk
+- Visual Studio or Rider **(to work on this project)**
+
 ### Running and building the project
 This part shows you how to build and run the project locally on your machine or anywhere you want using Visual Studio or the command line.
 
