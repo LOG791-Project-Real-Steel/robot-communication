@@ -35,9 +35,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 
-// Disabling https for now
-// app.UseHttpsRedirection();
-
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
