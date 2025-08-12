@@ -18,13 +18,12 @@ cts.CancelAfter(TimeSpan.FromSeconds(120));
 try
 {
     await client.ConnectAsync(uri, cts.Token);
-    int n = 0;
 
+    const int offset = 0;
     while (client.State == WebSocketState.Open)
     {
-        byte[] resBuffer = new byte[1024];
-        int offset = 0;
-        int packet = 1024;
+        var resBuffer = new byte[1024];
+        const int packet = 1024;
         while (true)
         {
             ArraySegment<byte> bytesRes = new ArraySegment<byte>(resBuffer, offset, packet);

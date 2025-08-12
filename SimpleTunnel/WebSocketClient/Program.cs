@@ -22,14 +22,14 @@ try
     while (client.State == WebSocketState.Open)
     {
         Console.WriteLine("Enter message to send");
-        string message = Console.ReadLine()!;
+        var message = Console.ReadLine()!;
 
         if (string.IsNullOrEmpty(message))
             continue;
 
         Message msg = new(message);
 
-        string json = JsonConvert.SerializeObject(msg);
+        var json = JsonConvert.SerializeObject(msg);
 
         ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(json));
         await client.SendAsync(buffer, WebSocketMessageType.Text, true, cts.Token);

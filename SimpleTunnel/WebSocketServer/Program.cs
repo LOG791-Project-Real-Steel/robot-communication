@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Console;
 using WebSocketServer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,14 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 builder.Services.AddSingleton<RobotWebSocketHandler>();
+
+// Clear logs
+builder.Logging.ClearProviders();
+builder.Logging
+    // pick the custom formatter
+    .AddConsole(o => o.FormatterName = MessageOnlyConsoleFormatter.Name)
+    // register it
+    .AddConsoleFormatter<MessageOnlyConsoleFormatter, ConsoleFormatterOptions>();
 
 var app = builder.Build();
 
@@ -22,19 +31,12 @@ app.Use(robotController.Handle);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
-{
     app.MapOpenApi();
-}
 
 app.UseRouting();
 
-// Disabling https for now
-// app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
 
 await Task.WhenAll(robotController.Processes);
