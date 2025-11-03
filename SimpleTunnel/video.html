@@ -47,8 +47,8 @@
 
         const urlCreator = window.URL || window.webkitURL;
         const video = document.getElementById('video');
-        const ws = new WebSocket('ws://localhost:5000/oculus');
-        // const ws = new WebSocket('ws://74.56.22.147:8765/oculus');
+        // const ws = new WebSocket('ws://localhost:5000/oculus');
+        const ws = new WebSocket('wss://home.adammihajlovic.ca/oculus');
         ws.binaryType = 'arraybuffer'; // Set binary type to receive ArrayBuffer
 
         const throttleMod = 0.20;
@@ -158,8 +158,8 @@
 
         setInterval(() => {
             if (up || down) {
-                riceCar.Car.Throttle -= up ? throttleMod : 0;
-                riceCar.Car.Throttle += down ? throttleMod : 0;
+                riceCar.Car.Throttle -= down ? throttleMod : 0;
+                riceCar.Car.Throttle += up ? throttleMod : 0;
             } else {
                 riceCar.Car.Throttle = zeroIn(riceCar.Car.Throttle, 1);
             }
